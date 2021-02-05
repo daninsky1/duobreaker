@@ -1,6 +1,7 @@
 import pathlib
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
+import collections.abc
 import copy
 
 # TODO: maybe is better import openpyxl inside the methods save and load scope
@@ -19,15 +20,35 @@ import copy
 class TransPair:
     """A translation pair.
 
-    A pair of string elements, empty strings are invalid.
+    A pair of string elements, to store sentence translation.
+    Empty strings are invalid.
     """
     def __init__(self, elem0, elem1):
         if (type(elem0) and type(elem1)) != str:
             raise TypeError("string element expected.")
         elif (elem0 and elem1) == "":
-            raise AttributeError("cannot store empty strings.")
+            raise ValueError("cannot store empty strings.")
         self.elem0 = elem0
         self.elem1 = elem1
+
+    def switch(self):
+        """Switch the elements. Invert the TransPair order."""
+        temp = self.elem0
+        self.elem0 = self.elem1
+        self.elem1 = temp
+
+    @classmethod
+    def fromlist(cls, item):
+        # TODO: change to from_sequence to accept more sequences like dictionary
+        if not isinstance(item, list) and not isinstance(item, list):
+            raise TypeError("must be a list or a tuple.")
+        elif len(item) < 2:
+            raise ValueError(f"Receives a two elements list or tuple\
+                             {len(item)} was given.")
+        elif len(item) > 2:
+            raise ValueError(f"Overload elements, receives a two elements list or tuple\
+                             {len(item)} was given.")
+        return cls(item[0], item[1])
 
     def __getitem__(self, index):
         if index == 0:
@@ -36,6 +57,12 @@ class TransPair:
             return self.elem1
         else:
             raise IndexError("TransPair index out of range")
+
+    def __contains__(self, item):
+        if (item == self.elem0) or (item == self.elem1):
+            return True
+        else:
+            return False
 
     def __str__(self):
         return f"({self.elem0}, {self.elem1})"
@@ -49,73 +76,73 @@ class TransPair:
         else:
             return False
 
-    def switch(self):
-        """Switch the elements. Invert the TransPair order."""
-        temp = self.elem0
-        self.elem0 = self.elem1
-        self.elem1 = temp
 
-
-class TransList:
-    """A list of TransPair."""
+class TransList(collections.UserList):
+    """A list/set of TransPair."""
 
     def __init__(self, *args):
+        """
+        :param args: TransPair or lists to construct TransPairs
+        """
+        super(TransList, self).__init__()
         self.map = []
         for arg in args:
-            if type(arg) == TransPair:
-                self.append(arg)
-            elif type(arg) == (list and tuple):
-                if len(arg) != 2:
-                    raise IndexError("arg list size must consist of 2  string elements.")
-                self.append(TransPair(arg[0], arg[1]))
-            else:
-                raise TypeError("arg must be a TransPair list or a tuple.")
+            self.append(arg)
 
     def append(self, tp_key):
         """Adds a new TransPair element into the end of the TransList."""
         if type(tp_key) != TransPair:
-            raise KeyError("the tp_key must be a TransPair object.")
-        elif tp_key in self.map:
+            raise TypeError("only TransPair object is accepted.")
+        elif super(TransList, self).__contains__(tp_key):
             raise KeyError("TransPair {} already assigned.".format(tp_key))
-        self.map.append(tp_key)
+        else:
+            super(TransList, self).append(tp_key)
 
     def insert(self, i, tp_key):
+        # TODO: test this method
         if type(tp_key) != TransPair:
             raise KeyError("the tp_key must be a TransPair object.")
-        elif tp_key in self.map:
+        elif super(TransList, self).__contains__(tp_key):
             raise KeyError("TransPair {} already assigned.".format(tp_key))
-        self.map.insert(i, tp_key)
+        super(TransList, self).insert(i, tp_key)
 
     def extend(self, other):
-        # TODO: not implemented
-        if type(other) != TransPair:
-            raise KeyError("the tp_key must be a TransPair object.")
-        pass
+        # TODO: test this method
+        for trans_pair in other:
+            self.append(trans_pair)
 
     def remove(self, tp_key):
         """Remove a TransPair element by element key."""
-        self.map.remove(tp_key)
+        super(TransList, self).remove(tp_key)
 
-    def pop(self, tp_index):
-        """Removes one element of the list by index."""
-        if type(tp_index) != int:
-            raise KeyError("tp_index must be a integer.")
-        self.map.pop(tp_index)
+    def pop(self, index=-1):
+        """Remove the item at the given position in the list, and return it.
+
+        If no index is specified, a.pop() removes and returns the last item in
+        the TransList.
+        """
+        super(TransList, self).pop(index)
 
     def __iter__(self):
-        return self.map.__iter__()
+        return super(TransList, self).__iter__()
 
     def __len__(self):
-        return self.map.__len__()
+        return super(TransList, self).__len__()
 
     def __getitem__(self, key):
-        return self.map.__getitem__(key)
+        return super(TransList, self).__getitem__(key)
+
+    def __contains__(self, item):
+        return super(TransList, self).__contains__(item)
 
     def __str__(self):
-        str_list = ""
-        for item in self.map:
-            str_list = str_list + str(item) + ",\n"
-        return f"{{\n{str_list}\n}}"
+        indent = "    "
+        trans_list_str = str()
+        for i, item in enumerate(super(TransList, self).__iter__()):
+            trans_list_str = trans_list_str + f"{indent} {str(item)}"
+            if i < super(TransList, self).__len__() - 1:
+                trans_list_str = trans_list_str + ", \n"
+        return f"{{\n{trans_list_str}\n}}"
 
     def __eq__(self, other):
         """Check if the list are the same in the same order.
@@ -125,9 +152,9 @@ class TransList:
         """
         if len(self.map) != len(other.map):
             return False
-        for curr_transpair, other_transpair in zip(self.map, other.map):
-            print(curr_transpair, other_transpair)
-            if curr_transpair == other_transpair:
+        for curr_trans_pair, other_trans_pair in zip(self.map, other.map):
+            print(curr_trans_pair, other_trans_pair)
+            if curr_trans_pair == other_trans_pair:
                 continue
             else:
                 return False
@@ -137,9 +164,8 @@ class TransList:
 class DatabaseError(Exception):
     pass
 
-"""01661600"""
 
-class TransDatabase:
+class Database:
     """Creates, load and manipulate sentences translations.
 
     The TransDatabase are objects that maps translation sentences inside of a
@@ -168,7 +194,6 @@ class TransDatabase:
         self.database_map = database_map
         self.first_lang = first_lang
         self.second_lang = second_lang
-
 
     def add_spreadsheet(self, spreadsheet):
         if spreadsheet in self.database_map:
@@ -306,6 +331,77 @@ Something is missing in:
 {}'''.format(row))
 
 
+class TransDatabase(collections.defaultdict):
+    """Creates, load and manipulate TransLists.
+
+    The TransDatabase are a dictionary that store and manipulate named TransList
+    that manipulate TransPairs objects, and are constructed with some helpful
+    attributes to organize your TransLists, load and manipulate TransPairs.
+    In a TransDatabase, the TransList has a unique key to uniquely identify
+    the TransList, but his content can be the same of other TransList.
+    When you initialize a empty TransDatabase you need to identify a
+    first_lang("e.g. EN-US") and second_lang("e.g. DE-CH") attribute. These are
+    mere index for you to know the order in which you have to store the
+    sentences, but not that does not stop the user store them wrong.
+    """
+    def __init__(self, first_lang, second_lang, *args):
+        """
+        :param first_lang:
+        :param second_lang:
+        :param args:
+        """
+        self.lang_attr = TransPair(first_lang, second_lang)
+        self.trans_list_names = []
+        self.database = {}
+        pass
+
+    def append(self, trans_list_name, trans_list):
+        """Append TransList with its name.
+
+        If TransList is empty the effect are the same of the method add_trans_list.
+        """
+        pass
+
+    def add_trans_list(self, trans_list_name):
+        """Add new empty TransList."""
+        if trans_list_name in self.database:
+            AttributeError("cannot assign two names")
+        self.trans_list_names.append()
+
+    def has_trans_list(self, trans_list_name):
+        pass
+
+    def save(self, file, overwrite=False):
+        # TODO: implement json save
+        pass
+
+    def get_translation(self, to_translate, trans_list_name, lang):
+        # TODO: instead of raise an exception change it only to log a the key error
+        """Search translation and return translation partner.
+
+        :param to_translate: Sentence to be searched
+        :param trans_list_name: TransList name
+        :param lang: Language of the sentence to be searched
+        :return: str
+        """
+
+
+    def __iter__(self):
+        pass
+
+    def __len__(self):
+        pass
+
+    def __getitem__(self, key):
+        """
+        :param key: can be index or a name of a TransList
+        :return: TransList
+        """
+        pass
+
+
+
+
 def test_db1():
     terra = TransDatabase('Frutas', 'terra', 'en', 'pt')
     arvores = TransDatabase('Frutas', 'arvores', 'en', 'pt')
@@ -328,11 +424,25 @@ def test_db():
     my_unique_values = {"banana", "oleo", "oil"}
     print(my_unique_values)
 
-if __name__ == '__main__':
+def test_db2():
     my_translist = TransList(("hi", "oi"))
-    my_translist2 = TransList(("hi", "oi"))
-    trans_pair = TransPair("car", "carro")
-    # my_translist2.append(trans_pair)
-    print(my_translist)
-    print(my_translist2)
-    print(my_translist == my_translist2)
+    my_translist2 = TransList(["car", "carro"])
+    new_translist = TransList()
+    my_trans_pair = TransPair("olá", "hello")
+    new_translist.extend(my_translist)
+    new_translist.extend(my_translist2)
+
+    print(my_translist, my_translist2, sep="\n")
+
+
+
+def tl_contains_test():
+    hi = TransPair("hi", "oi")
+    my_trans_list = TransList(hi)
+    my_trans_list.append(hi)
+
+
+if __name__ == '__main__':
+    import inspect
+    print(inspect.signature(collections.UserList.pop))
+    print(collections.UserList.pop.__doc__)
