@@ -85,13 +85,21 @@ class TransList(collections.UserList):
         :param args: TransPair or lists to construct TransPairs
         """
         super(TransList, self).__init__()
-        self.map = []
         for arg in args:
             self.append(arg)
 
+    def __str__(self):
+        indent = "    "
+        trans_list_str = str()
+        for i, item in enumerate(super(TransList, self).__iter__()):
+            trans_list_str = trans_list_str + f"{indent} {str(item)}"
+            if i < super(TransList, self).__len__() - 1:
+                trans_list_str = trans_list_str + ", \n"
+        return f"{{\n{trans_list_str}\n}}"
+
     def append(self, tp_key):
         """Adds a new TransPair element into the end of the TransList."""
-        if type(tp_key) != TransPair:
+        if not isinstance(tp_key, TransPair):
             raise TypeError("only TransPair object is accepted.")
         elif super(TransList, self).__contains__(tp_key):
             raise KeyError("TransPair {} already assigned.".format(tp_key))
@@ -123,215 +131,8 @@ class TransList(collections.UserList):
         """
         super(TransList, self).pop(index)
 
-    def __iter__(self):
-        return super(TransList, self).__iter__()
 
-    def __len__(self):
-        return super(TransList, self).__len__()
-
-    def __getitem__(self, key):
-        return super(TransList, self).__getitem__(key)
-
-    def __contains__(self, item):
-        return super(TransList, self).__contains__(item)
-
-    def __str__(self):
-        indent = "    "
-        trans_list_str = str()
-        for i, item in enumerate(super(TransList, self).__iter__()):
-            trans_list_str = trans_list_str + f"{indent} {str(item)}"
-            if i < super(TransList, self).__len__() - 1:
-                trans_list_str = trans_list_str + ", \n"
-        return f"{{\n{trans_list_str}\n}}"
-
-    def __eq__(self, other):
-        """Check if the list are the same in the same order.
-
-        If the TransLists have the same TransPairs with other order will return False
-        not equal.
-        """
-        if len(self.map) != len(other.map):
-            return False
-        for curr_trans_pair, other_trans_pair in zip(self.map, other.map):
-            print(curr_trans_pair, other_trans_pair)
-            if curr_trans_pair == other_trans_pair:
-                continue
-            else:
-                return False
-        return True
-
-
-class DatabaseError(Exception):
-    pass
-
-
-class Database:
-    """Creates, load and manipulate sentences translations.
-
-    The TransDatabase are objects that maps translation sentences inside of a
-    spreadsheet or multiple spreadsheets. The propose are to store sentences of
-    a language (your native language) in pair with another language (foreign
-    language).
-    In a TransDatabase, the spreadsheet has a unique value to uniquely identify
-    the spreadsheet, but his content can be the same of other spreadsheet,
-    you can have how many you need.
-    When you initialize a empty TransDatabase you need to uniquely identify a
-    first_lang("e.g. EN-US") and second_lang("e.g. DE-CH") value. These are mere
-    attributes for you to know the order in which you have to store the sentences,
-    this does not guarantee that you will store them wrong, if it happens, use
-    the correction methods available in this class.
-    For easier implementation the sentence values need to be unique.
-    """
-
-    def __init__(self, first_lang, second_lang, database_map={}):
-        """Creates a database.
-
-        :param spreadsheet: Spreadsheet name inside the .xlsx file
-        :param first_lang: first language description (default "first lang")
-        :param second_lang: second language description (default "second lang")
-        :return: None
-        """
-        self.database_map = database_map
-        self.first_lang = first_lang
-        self.second_lang = second_lang
-
-    def add_spreadsheet(self, spreadsheet):
-        if spreadsheet in self.database_map:
-            DatabaseError("Spreadsheet {} already exist.".format(spreadsheet))
-
-        self.database_map[spreadsheet] = []
-
-    def add_translation(self, spreadsheet, fl_sentence, sl_sentence):
-        """Append a translation to the database.
-
-        :param spreadsheet: spreadsheet to be add
-        :param fl_sentence: First language sentence.
-        :param sl_sentence: Second language sentence.
-        :return: None
-        """
-        trans_pair = [fl_sentence, sl_sentence]
-        if spreadsheet not in self.database_map:
-            raise DatabaseError("This spreadsheet {} doesn't exist.".format(spreadsheet))
-        elif trans_pair in self.database_map[spreadsheet]:
-            raise DatabaseError("This translation pair already exist.")
-
-        self.database_map[spreadsheet].append(trans_pair)
-
-    @classmethod
-    def from_disk(cls, file):
-        """Load a from disk a .xlsx translation database.
-
-        :param file: Path-like object where the database will be opened
-        :return: class
-        """
-        if not pathlib.Path(file).is_file():
-            raise DatabaseError("This file \"{}\" doesn't exist.".format(file))
-
-        workbook = load_workbook(file)
-        sheet = workbook.active
-        first_lang = sheet["A1"].value
-        second_lang = sheet["B1"].value
-        database_map = TransDatabase(first_lang, second_lang)
-        for spreadsheet in workbook.sheetnames:
-            spreadsheet = workbook[spreadsheet]
-            database_map[spreadsheet] = []
-            for row in spreadsheet.iter_rows(min_row=1, max_col=2, values_only=True):
-                database_map[spreadsheet] = None
-
-        return cls(first_lang, second_lang, database_map=database_map)
-
-    def has_spreadsheet(self, spreadsheet):
-        """Search a spreadsheet in the database_map.
-
-        :param spreadsheet: spreadsheet to search for
-        :return: boolean
-        """
-        if spreadsheet in self.database_map:
-            return True
-        else:
-            return False
-
-    def has_trans_pair(self, spreadsheet, fl_sentence, sl_sentence):
-        trans_pair = [fl_sentence, sl_sentence]
-        if trans_pair in self.database_map[spreadsheet]:
-            return True
-        else:
-            return False
-
-    def change_lang_attrs(self, first_lang, second_lang):
-        """Change the language attributes."""
-
-        self.first_lang = first_lang
-        self.second_lang = second_lang
-
-    def save(self, file, overwrite=False):
-        workbook = Workbook()
-        worksheet = workbook.active   # current working spreadsheet
-
-        default_font = Font(name='Arial', size=12)
-        header_font = Font(name='Arial', size=14, bold=True)
-        worksheet.column_dimensions['A'].font = default_font
-        worksheet.column_dimensions['B'].font = default_font
-        worksheet['A1'].font = header_font
-        worksheet['B1'].font = header_font
-
-        worksheet['C1'] = self.first_lang
-        worksheet['D1'] = self.second_lang
-
-        cell_width = 60
-        cell_height = 20
-        worksheet.column_dimensions['A'].width = cell_width
-        worksheet.column_dimensions['B'].width = cell_width
-        worksheet.row_dimensions[1].height = cell_height
-
-        if not overwrite and pathlib.Path.is_file(file):
-            raise DatabaseError("This file \"{}\" already exist.".format(file))
-
-        workbook.save(file)
-
-
-
-    def get_translation(self, to_translate, switch_lang):
-        """Search translation.
-        
-        :param to_translate: Sentence to be searched
-        :param switch_lang: If is true invert the language search
-        :return: str
-        """
-        if not isinstance(switch_lang, bool):
-            raise EOFError('TypeError. It\'s not a boolean value.')
-
-        if switch_lang:
-            search_i = 0
-            transl_i = 1
-        else:
-            search_i = 1
-            transl_i = 0
-
-        self.database = load_workbook(self.wb_file)
-        self.worksheet = self.database[self.local_database]
-
-        for dictionary in self.worksheet.rows:
-            # Returns a tuple with the cells with the translations
-            if to_translate == dictionary[search_i].value:
-                return dictionary[transl_i].value
-        return None
-
-    def check_health(self):
-        """Compares the number of lines in each database,
-        if does'nt match something is wrong.
-        If sheet = None he auto check all sheet length"""
-
-        rows_values = self.worksheet.values
-        rows = self.worksheet.iter_rows()
-        for row, row_values in zip(rows, rows_values):
-            if None in row_values:
-                raise Exception('''TroubleWithTheFile.
-Something is missing in:
-{}'''.format(row))
-
-
-class TransDatabase(collections.defaultdict):
+class TransDatabase(dict):
     """Creates, load and manipulate TransLists.
 
     The TransDatabase are a dictionary that store and manipulate named TransList
@@ -353,6 +154,18 @@ class TransDatabase(collections.defaultdict):
         self.lang_attr = TransPair(first_lang, second_lang)
         self.trans_list_names = []
         self.database = {}
+
+    def __iter__(self):
+        pass
+
+    def __len__(self):
+        pass
+
+    def __getitem__(self, key):
+        """
+        :param key: can be index or a name of a TransList
+        :return: TransList
+        """
         pass
 
     def append(self, trans_list_name, trans_list):
@@ -385,44 +198,63 @@ class TransDatabase(collections.defaultdict):
         :return: str
         """
 
+    @classmethod
+    def from_disk(cls, file):
+        """Load a from disk a .xlsx translation database.
 
-    def __iter__(self):
-        pass
-
-    def __len__(self):
-        pass
-
-    def __getitem__(self, key):
+        :param file: Path-like object where the database will be opened
+        :return: class
         """
-        :param key: can be index or a name of a TransList
-        :return: TransList
-        """
+        if not pathlib.Path(file).is_file():
+            raise DatabaseError("This file \"{}\" doesn't exist.".format(file))
+
+        workbook = load_workbook(file)
+        sheet = workbook.active
+        first_lang = sheet["A1"].value
+        second_lang = sheet["B1"].value
+        database_map = TransDatabase(first_lang, second_lang)
+        for spreadsheet in workbook.sheetnames:
+            spreadsheet = workbook[spreadsheet]
+            database_map[spreadsheet] = []
+            for row in spreadsheet.iter_rows(min_row=1, max_col=2, values_only=True):
+                database_map[spreadsheet] = None
+
+        return cls(first_lang, second_lang, database_map=database_map)
+
+    def change_lang_attrs(self, first_lang, second_lang):
+        """Change the language attributes."""
+
+        self.first_lang = first_lang
+        self.second_lang = second_lang
+
+    def save(self, file, overwrite=False):
+        workbook = Workbook()
+        worksheet = workbook.active   # current working spreadsheet
+
+        default_font = Font(name='Arial', size=12)
+        header_font = Font(name='Arial', size=14, bold=True)
+        worksheet.column_dimensions['A'].font = default_font
+        worksheet.column_dimensions['B'].font = default_font
+        worksheet['A1'].font = header_font
+        worksheet['B1'].font = header_font
+
+        worksheet['C1'] = self.first_lang
+        worksheet['D1'] = self.second_lang
+
+        cell_width = 60
+        cell_height = 20
+        worksheet.column_dimensions['A'].width = cell_width
+        worksheet.column_dimensions['B'].width = cell_width
+        worksheet.row_dimensions[1].height = cell_height
+
+        if not overwrite and pathlib.Path.is_file(file):
+            raise DatabaseError("This file \"{}\" already exist.".format(file))
+
+        workbook.save(file)
+
+    def get_translation(self):
         pass
 
-
-
-
-def test_db1():
-    terra = TransDatabase('Frutas', 'terra', 'en', 'pt')
-    arvores = TransDatabase('Frutas', 'arvores', 'en', 'pt')
-    frutos = TransDatabase('Frutas', 'mar', 'en', 'pt')
-
-    terra.add_translation('papaya', 'mamão', True)
-    terra.add_translation('papaya', 'mamão', True)
-    terra.add_translation('papaya', 'mamão', True)
-    terra.add_translation('papaya', 'mamão', True)
-    frutos.add_translation('tomate', 'tomato', True)
-    arvores.add_translation('maça', 'apple', True)
-
-
-
-def test_xlsx(file):
-    database = TransDatabase.from_disk(file)
-
-def test_db():
-    # test_xlsx(r"E:\Daniel\Dev\Python\duo_breaker\duo_breaker_v1\database\Acidentes\Acidentes_en_to_pt_dictionary.xlsx")
-    my_unique_values = {"banana", "oleo", "oil"}
-    print(my_unique_values)
 
 def test_db2():
     my_translist = TransList(("hi", "oi"))
@@ -443,6 +275,4 @@ def tl_contains_test():
 
 
 if __name__ == '__main__':
-    import inspect
-    print(inspect.signature(collections.UserList.pop))
-    print(collections.UserList.pop.__doc__)
+    pass
