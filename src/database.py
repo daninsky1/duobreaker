@@ -1,80 +1,47 @@
-import pathlib
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 import collections.abc
+import json
+import pickle
+import pathlib
+import inspect
 import copy
 
-# TODO: maybe is better import openpyxl inside the methods save and load scope
 
-# Setup the file path
-# TODO: this folder needs to be config outside database
-# self.db_folder = pathlib.Path.cwd() / 'database' / '{}'.format(self.file)
-# self.db_folder.mkdir(exist_ok=True)
-#
-# # The workbook file name
-# self.wb_file = self.db_folder / '{}_{}_to_{}_dictionary.xlsx'.format(
-#     self.file, self.foreign_lang, self.native_lang
-# )
-
-
-class TransPair:
+class TransPair(collections.UserList):
     """A translation pair.
 
     A pair of string elements, to store sentence translation.
     Empty strings are invalid.
     """
-    def __init__(self, elem0, elem1):
-        if (type(elem0) and type(elem1)) != str:
+    def __init__(self, item0, item1):
+        if not isinstance(item0, str) and not isinstance(item1, str):
             raise TypeError("string element expected.")
-        elif (elem0 and elem1) == "":
+        elif (item0 and item1) == "":
             raise ValueError("cannot store empty strings.")
-        self.elem0 = elem0
-        self.elem1 = elem1
+        super(TransPair, self).__init__([item0, item1])
+
+    def __getattribute__(self, attr):
+        """Prevent 'private' attribute access"""
+        private_super = [
+            "append", "extend", "insert",
+            "pop", "remove", "clear", "sort"
+        ]
+        if attr in private_super:
+            raise AttributeError
+        else:
+            return super(TransPair, self).__getattribute__(attr)
+
+    def __setitem__(self, key, value):
+        if not isinstance(value, str):
+            raise TypeError("string element expected.")
+        elif len(value) == 0:
+            raise ValueError("cannot store empty strings.")
+        super(TransPair, self).__setitem__(key, value)
 
     def switch(self):
         """Switch the elements. Invert the TransPair order."""
-        temp = self.elem0
-        self.elem0 = self.elem1
-        self.elem1 = temp
-
-    @classmethod
-    def fromlist(cls, item):
-        # TODO: change to from_sequence to accept more sequences like dictionary
-        if not isinstance(item, list) and not isinstance(item, list):
-            raise TypeError("must be a list or a tuple.")
-        elif len(item) < 2:
-            raise ValueError(f"Receives a two elements list or tuple\
-                             {len(item)} was given.")
-        elif len(item) > 2:
-            raise ValueError(f"Overload elements, receives a two elements list or tuple\
-                             {len(item)} was given.")
-        return cls(item[0], item[1])
-
-    def __getitem__(self, index):
-        if index == 0:
-            return self.elem0
-        elif index == 1:
-            return self.elem1
-        else:
-            raise IndexError("TransPair index out of range")
-
-    def __contains__(self, item):
-        if (item == self.elem0) or (item == self.elem1):
-            return True
-        else:
-            return False
-
-    def __str__(self):
-        return f"({self.elem0}, {self.elem1})"
-
-    def __repr__(self):
-        return f"TransPair({self.elem0}, {self.elem1})"
-
-    def __eq__(self, other):
-        if (self.elem0 == other.elem0) and (self.elem1 == other.elem1):
-            return True
-        else:
-            return False
+        super(TransPair, self).reverse()
 
 
 class TransList(collections.UserList):
@@ -131,6 +98,25 @@ class TransList(collections.UserList):
         """
         super(TransList, self).pop(index)
 
+    def get_translation(self, sentence, hint=0):
+        """Return a the translation.
+
+        Hint is where the search will take place. If 0 will search the sentence on
+        all TransPairs elements. if 1 will do the search only on the first TransPairs
+        index. If 2 will do the search only on the second TransPairs index.
+        :param sentence:
+        :param hint:
+        :return: str
+        """
+        if hint == 0 or hint == 1:
+            for transpair in self:
+                if transpair[0] == sentence:
+                    return transpair[1]
+        if hint == 0 or hint == 2:
+            for transpair in self:
+                if transpair[1] == sentence:
+                    return transpair[0]
+
 
 class TransDatabase(dict):
     """Creates, load and manipulate TransLists.
@@ -145,114 +131,146 @@ class TransDatabase(dict):
     mere index for you to know the order in which you have to store the
     sentences, but not that does not stop the user store them wrong.
     """
-    def __init__(self, first_lang, second_lang, *args):
-        """
-        :param first_lang:
-        :param second_lang:
-        :param args:
-        """
-        self.lang_attr = TransPair(first_lang, second_lang)
-        self.trans_list_names = []
-        self.database = {}
+    def __init__(self, first_lang, second_lang, **kwargs):
+        super().__init__()
+        self.info = {"language": TransPair(first_lang, second_lang),
+                     "creator": "Daniel Daninsky",
+                     "script": "duobreaker v0.1"}
+        for trans_list_name, trans_pairs in kwargs.items():
+            self.add(trans_list_name, trans_pairs)
 
-    def __iter__(self):
-        pass
+    def __setitem__(self, trans_list_name, trans_list):
+        """Set self[key] to value.
 
-    def __len__(self):
-        pass
-
-    def __getitem__(self, key):
+        Caution: note that __setitem__ can overwrite data. So if you want add
+        a new key with a overwrite garanty use the add method.
         """
-        :param key: can be index or a name of a TransList
-        :return: TransList
-        """
-        pass
+        if not isinstance(trans_list_name, str):
+            raise TypeError("invalid type")
+        elif not isinstance(trans_list, TransList):
+            TypeError("object isn't a TransList")
+        else:
+            super(TransDatabase, self).__setitem__(trans_list_name, trans_list)
 
-    def append(self, trans_list_name, trans_list):
-        """Append TransList with its name.
+    def add(self, trans_list_name, trans_list=None):
+        """Add TransList with its name in the end of TransDatabase.
 
         If TransList is empty the effect are the same of the method add_trans_list.
+        Add are recomended to add new TransList. Add has overwrite guard that
+        __setitem__ doesn't.
         """
-        pass
+        if trans_list_name in self:
+            raise KeyError("TransList already exists")
+        if trans_list == None:
+            trans_list = TransList()
+        else:
+            self.__setitem__(trans_list_name, trans_list)
 
-    def add_trans_list(self, trans_list_name):
-        """Add new empty TransList."""
-        if trans_list_name in self.database:
-            AttributeError("cannot assign two names")
-        self.trans_list_names.append()
+    def get_translation(self, key, sentence, lang=None):
+        """Get the translation."""
+        if lang == self.langs[0]:
+            return self[key].get_translation(sentence, 1)
+        elif lang == self.langs[1]:
+            return self[key].get_translation(sentence, 2)
+        else:
+            return self[key].get_translation(sentence, 0)
 
-    def has_trans_list(self, trans_list_name):
-        pass
+    def getbyindex(self, index):
+        """Return TransList by index."""
+        if index < 0 or index > len(self):
+            raise IndexError("TransDatabase index out of range")
+        for i, item in enumerate(self):
+            if i == index:
+                return self[item]
 
-    def save(self, file, overwrite=False):
-        # TODO: implement json save
-        pass
-
-    def get_translation(self, to_translate, trans_list_name, lang):
-        # TODO: instead of raise an exception change it only to log a the key error
-        """Search translation and return translation partner.
-
-        :param to_translate: Sentence to be searched
-        :param trans_list_name: TransList name
-        :param lang: Language of the sentence to be searched
-        :return: str
-        """
+    def save(self, file, overwrite=False, extension="xlsx"):
+        if not isinstance(extension, str):
+            raise TypeError("invalid type")
+        extension = extension.casefold()
+        if extension == "xlsx":
+            self.__xlsx_save(file)
+        elif extension == "json":
+            self.__json_save(file)
+        else:
+            raise ValueError("invalid extension type. xlsx or json")
 
     @classmethod
-    def from_disk(cls, file):
+    def fromfile(cls, file):
         """Load a from disk a .xlsx translation database.
 
         :param file: Path-like object where the database will be opened
-        :return: class
+        :return: TransDatabase
         """
-        if not pathlib.Path(file).is_file():
-            raise DatabaseError("This file \"{}\" doesn't exist.".format(file))
-
-        workbook = load_workbook(file)
-        sheet = workbook.active
-        first_lang = sheet["A1"].value
-        second_lang = sheet["B1"].value
-        database_map = TransDatabase(first_lang, second_lang)
-        for spreadsheet in workbook.sheetnames:
-            spreadsheet = workbook[spreadsheet]
-            database_map[spreadsheet] = []
-            for row in spreadsheet.iter_rows(min_row=1, max_col=2, values_only=True):
-                database_map[spreadsheet] = None
-
-        return cls(first_lang, second_lang, database_map=database_map)
+        if not isinstance(file, str):
+            raise TypeError("invalid type")
+        extension = file[-4:]
+        extension = extension.casefold()    # <- this is fucking bullshit
+        if extension == "xlsx":
+            # TODO: add a attribute support to the files
+            kwargs = cls.__xlsx_load(file)
+            first_lang = "EN-US"   # TODO: hardcoded temporariamente
+            second_lang = "PT-BR"
+            return cls(first_lang, second_lang, **kwargs)
+        elif extension == "json":
+            cls.__json_load(file)
+        else:
+            raise ValueError("invalid extension file. xlsx or json")
 
     def change_lang_attrs(self, first_lang, second_lang):
         """Change the language attributes."""
+        self.info["language"] = TransPair(first_lang, second_lang)
 
-        self.first_lang = first_lang
-        self.second_lang = second_lang
-
-    def save(self, file, overwrite=False):
+    def __xlsx_save(self, file):
+        # TODO: improve style and add a info style
         workbook = Workbook()
-        worksheet = workbook.active   # current working spreadsheet
-
-        default_font = Font(name='Arial', size=12)
-        header_font = Font(name='Arial', size=14, bold=True)
-        worksheet.column_dimensions['A'].font = default_font
-        worksheet.column_dimensions['B'].font = default_font
-        worksheet['A1'].font = header_font
-        worksheet['B1'].font = header_font
-
-        worksheet['C1'] = self.first_lang
-        worksheet['D1'] = self.second_lang
-
-        cell_width = 60
-        cell_height = 20
-        worksheet.column_dimensions['A'].width = cell_width
-        worksheet.column_dimensions['B'].width = cell_width
-        worksheet.row_dimensions[1].height = cell_height
-
-        if not overwrite and pathlib.Path.is_file(file):
-            raise DatabaseError("This file \"{}\" already exist.".format(file))
-
+        worksheet = workbook.active  # current working spreadsheet
+        workbook.remove(worksheet)
+        def sheet_decor(worksheet):
+            """Sheet style fo here, font, size, etc."""
+            default_font = Font(name='Arial', size=12)
+            header_font = Font(name='Arial', size=14, bold=True)
+            worksheet.column_dimensions['A'].font = default_font
+            worksheet.column_dimensions['B'].font = default_font
+            worksheet['A1'].font = header_font
+            worksheet['B1'].font = header_font
+            cell_width = 60
+            cell_height = 20
+            worksheet.column_dimensions['A'].width = cell_width
+            worksheet.column_dimensions['B'].width = cell_width
+            worksheet.row_dimensions[1].height = cell_height
+        # add content
+        for key, value in self.items():
+            worksheet = workbook.create_sheet(key)
+            sheet_decor(worksheet)
+            for num, trans_pair in enumerate(value, start=1):
+                worksheet.cell(row=num, column=1).value = trans_pair[0]
+                worksheet.cell(row=num, column=2).value = trans_pair[1]
+        # add info
+        worksheet_info = workbook.create_sheet("info")
+        for num, (key, value) in enumerate(self.info.items(), start=1):
+            worksheet_info.cell(row=num, column=1).value = key
+            worksheet_info.cell(row=num, column=2).value = repr(value)   # repr to serialize the object
         workbook.save(file)
 
-    def get_translation(self):
+    def __json_save(self, file):
+        # TODO: implement
+        pass
+
+    @staticmethod
+    def __xlsx_load(file):
+        workbook = load_workbook(file)
+        kwargs = {}
+        for spreadsheet in workbook.worksheets:
+            trans_list = TransList()
+            spreadsheet_name = spreadsheet.title
+            for row in spreadsheet.iter_rows(min_row=1, max_col=2, values_only=True):
+                # TODO: add ordered sequence suport to the TransPair constructor
+                trans_list.append(TransPair(row[0], row[1]))
+            kwargs[spreadsheet_name] = trans_list
+        return kwargs
+
+    def __json_load(self, file):
+        # TODO: implement
         pass
 
 
@@ -267,12 +285,32 @@ def test_db2():
     print(my_translist, my_translist2, sep="\n")
 
 
-
 def tl_contains_test():
     hi = TransPair("hi", "oi")
     my_trans_list = TransList(hi)
     my_trans_list.append(hi)
 
+def td_test():
+    my_tl = TransList()
+    translations = [["car", "carro"], ["water", "água"]]
+    for phrases in translations:
+        my_tl.append(TransPair(phrases[0], phrases[1]))
+
+    my_database = TransDatabase("en", "pt")
+    my_database.add("saudações", my_tl)
+    my_database.add("phrases")
+    my_database["daniel"] = my_tl
+
+    my_tl_back = my_database["saudações"]
+
+    print(len(my_tl))
+    print(len(my_database["daniel"]))
+    print(type(my_database["daniel"]))
+    print(my_tl)
+    print(my_database)
+
 
 if __name__ == '__main__':
-    pass
+    my_tdb = TransDatabase.fromfile(r"../database/Acidentes/Acidentes_en_to_pt_dictionary.xlsx")
+    my_tdb.save("test.xlsx")
+    print(my_tdb)
