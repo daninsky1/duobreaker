@@ -201,17 +201,17 @@ class TransDatabase(dict):
         :param file: Path-like object where the database will be opened
         :return: TransDatabase
         """
-        if not isinstance(file, str):
-            raise TypeError("invalid type")
-        extension = file[-4:]
+        if not isinstance(file, pathlib.Path):
+            file = pathlib.Path(file)
+        extension = file.
         extension = extension.casefold()    # <- this is fucking bullshit
-        if extension == "xlsx":
+        if extension == ".xlsx":
             # TODO: add a attribute support to the files
             kwargs = cls.__xlsx_load(file)
             first_lang = "EN-US"   # TODO: hardcoded temporariamente
             second_lang = "PT-BR"
             return cls(first_lang, second_lang, **kwargs)
-        elif extension == "json":
+        elif extension == ".json":
             cls.__json_load(file)
         else:
             raise ValueError("invalid extension file. xlsx or json")
@@ -228,16 +228,12 @@ class TransDatabase(dict):
         def sheet_decor(worksheet):
             """Sheet style fo here, font, size, etc."""
             default_font = Font(name='Arial', size=12)
-            header_font = Font(name='Arial', size=14, bold=True)
             worksheet.column_dimensions['A'].font = default_font
             worksheet.column_dimensions['B'].font = default_font
-            worksheet['A1'].font = header_font
-            worksheet['B1'].font = header_font
             cell_width = 60
             cell_height = 20
             worksheet.column_dimensions['A'].width = cell_width
             worksheet.column_dimensions['B'].width = cell_width
-            worksheet.row_dimensions[1].height = cell_height
         # add content
         for key, value in self.items():
             worksheet = workbook.create_sheet(key)
@@ -246,6 +242,7 @@ class TransDatabase(dict):
                 worksheet.cell(row=num, column=1).value = trans_pair[0]
                 worksheet.cell(row=num, column=2).value = trans_pair[1]
         # add info
+        header_font = Font(name='Arial', size=14, bold=True)
         worksheet_info = workbook.create_sheet("info")
         for num, (key, value) in enumerate(self.info.items(), start=1):
             worksheet_info.cell(row=num, column=1).value = key
