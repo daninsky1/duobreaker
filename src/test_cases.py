@@ -151,13 +151,15 @@ def tl_eq():
     print("* TransList.__eq__(): ", sep="", end="")
     my_tl = TransList()
     my_tl2 = TransList()
+    my_tl3 = TransList()
     car = TransPair("car", "carro")
     water = TransPair("water", "água")
     my_tl.append(car)
     my_tl.append(water)
     my_tl2.append(car)
     my_tl2.append(water)
-    if my_tl == my_tl2:
+    my_tl3.append(car)
+    if my_tl == my_tl2 and my_tl != my_tl3:
         print("Passed!")
     else:
         print("Failed")
@@ -173,7 +175,28 @@ def test_trans_list():
     tl_getitem()
     tl_append()
     tl__contains()
+    tl_eq()
 
+def tp_init():
+    mytp = TransPair("hi", "oi")
+    print(mytp)
+
+def tp_iter():
+    mytp = TransPair("hi", "oi")
+    for item in mytp:
+        print(item)
+
+def tp_switch():
+    mytp = TransPair("hi", "oi")
+    mytp.switch()
+    print(mytp)
+
+def tp_append():
+    mytp = TransPair("hi", "oi")
+    mytp.append("hello")
+    print(mytp)
 
 if __name__ == "__main__":
-    test_trans_list()
+    import json
+    print(dir(tuple))
+    # tp_append()
