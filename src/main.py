@@ -8,7 +8,7 @@ import time
 import logging
 import pathlib
 from win10toast import ToastNotifier
-from dbreaker_database import Database
+from database import Database
 
 # Notification obj
 toaster = ToastNotifier()
