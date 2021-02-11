@@ -19,8 +19,6 @@ def refactor_xlsx():
     files = get_files("../olddatabase/", "xlsx")
     for file in files:
         tdb = database.TransDatabase.fromfile(file)
-        for key in tdb.keys():
-            tdb[key].remove(database.TransPair("en", "pt"))
         print(file)
         basename = pathlib.Path(file).name
         basedir = pathlib.Path(file).parent.name
@@ -30,5 +28,12 @@ def refactor_xlsx():
         tdb.save(new_file)
         print(new_file)
 
+
+def chk_ponctuation():
+    # TODO: check ponctuation on the database and correct
+    pass
+
 if __name__ == "__main__":
     refactor_xlsx()
+    # my_tdb = database.TransDatabase.fromfile("..\olddatabase\Acidentes\Acidentes_en_to_pt_dictionary.xlsx")
+    # my_tdb.save("../test.xlsx")

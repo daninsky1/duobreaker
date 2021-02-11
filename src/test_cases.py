@@ -1,4 +1,4 @@
-from database import TransPair, TransList
+from database import TransPair, TransList, TransDatabase
 
 
 # TODO: use a xlsx database to test methods
@@ -195,6 +195,49 @@ def tp_append():
     mytp = TransPair("hi", "oi")
     mytp.append("hello")
     print(mytp)
+
+
+def test_db2():
+    my_translist = TransList(("hi", "oi"))
+    my_translist2 = TransList(["car", "carro"])
+    new_translist = TransList()
+    my_trans_pair = TransPair("olá", "hello")
+    new_translist.extend(my_translist)
+    new_translist.extend(my_translist2)
+
+    print(my_translist, my_translist2, sep="\n")
+
+
+def tl_contains_test():
+    hi = TransPair("hi", "oi")
+    my_trans_list = TransList(hi)
+    my_trans_list.append(hi)
+
+def td_test():
+    my_tl = TransList()
+    translations = [["car", "carro"], ["water", "água"]]
+    for phrases in translations:
+        my_tl.append(TransPair(phrases[0], phrases[1]))
+
+    my_database = TransDatabase("en", "pt")
+    my_database.add("saudações", my_tl)
+    my_database.add("phrases")
+    my_database["daniel"] = my_tl
+
+    my_tl_back = my_database["saudações"]
+
+    print(len(my_tl))
+    print(len(my_database["daniel"]))
+    print(type(my_database["daniel"]))
+    print(my_tl)
+    print(my_database)
+
+def tdb_load_save_test():
+    my_tdb = TransDatabase.fromfile(r"../database/Acidentes/Acidentes_en_to_pt_dictionary.xlsx")
+    my_tdb.save(r"../test_noascii.json")
+    my_tdb2 = TransDatabase.fromfile(r"../test_noascii.json")
+    my_tdb2.save(r"../test.xlsx")
+
 
 if __name__ == "__main__":
     import json
