@@ -14,6 +14,8 @@ class TransPair(collections.UserList):
     A pair of string elements, to store sentence translation.
     Empty strings are invalid.
     """
+    # TODO: change initialization to accept *args for 2 item list,
+    # and 2 string args
     def __init__(self, item0, item1):
         if not isinstance(item0, str) and not isinstance(item1, str):
             raise TypeError("string element expected.")
@@ -133,11 +135,20 @@ class TransDatabase(dict):
     """
     def __init__(self, first_lang, second_lang, **kwargs):
         super().__init__()
-        self.info = {"language": TransPair(first_lang, second_lang),
-                     "creator": "Daniel Daninsky",
-                     "script": "duobreaker v0.1"}
-        for trans_list_name, trans_pairs in kwargs.items():
-            self.add(trans_list_name, trans_pairs)
+        self.info = {
+            "language": [first_lang, second_lang],
+            "creator": "Daniel Daninsky",
+            "script": "duobreaker v0.1"
+        }
+        # TODO: pop info, imprement better metadata handler
+        if kwargs:
+            if "info" in kwargs:
+                kwargs.pop("info")
+        for tlist_name, decor_tlist in kwargs.items():
+            tlist = TransList()
+            for tpair in decor_tlist:
+                tlist.append(TransPair(tpair[0], tpair[1]))
+            self.add(tlist_name, tlist)
 
     def __setitem__(self, trans_list_name, trans_list):
         """Set self[key] to value.
@@ -183,13 +194,13 @@ class TransDatabase(dict):
             if i == index:
                 return self[item]
 
-    def save(self, file, overwrite=False, extension="xlsx"):
-        if not isinstance(extension, str):
-            raise TypeError("invalid type")
-        extension = extension.casefold()
-        if extension == "xlsx":
+    def save(self, file, overwrite=False):
+        if not isinstance(file, pathlib.Path):
+            file = pathlib.Path(file)
+        extension = file.suffix
+        if extension == ".xlsx":
             self.__xlsx_save(file)
-        elif extension == "json":
+        elif extension == ".json":
             self.__json_save(file)
         else:
             raise ValueError("invalid extension type. xlsx or json")
@@ -203,23 +214,27 @@ class TransDatabase(dict):
         """
         if not isinstance(file, pathlib.Path):
             file = pathlib.Path(file)
-        extension = file.
+        extension = file.suffix
         extension = extension.casefold()    # <- this is fucking bullshit
+        first_lang = "EN-US"   # TODO: hardcoded temporariamente
+        second_lang = "PT-BR"
         if extension == ".xlsx":
             # TODO: add a attribute support to the files
             kwargs = cls.__xlsx_load(file)
-            first_lang = "EN-US"   # TODO: hardcoded temporariamente
-            second_lang = "PT-BR"
             return cls(first_lang, second_lang, **kwargs)
         elif extension == ".json":
-            cls.__json_load(file)
+            kwargs = cls.__json_load(file)
+            print(kwargs)
+            return cls(first_lang, second_lang, **kwargs)
         else:
             raise ValueError("invalid extension file. xlsx or json")
 
     def change_lang_attrs(self, first_lang, second_lang):
         """Change the language attributes."""
         self.info["language"] = TransPair(first_lang, second_lang)
-
+    
+    # TODO: make saves static methods for simplify data flow
+    # TransDatabase save --> dict, dict load --> TransDatabase
     def __xlsx_save(self, file):
         # TODO: improve style and add a info style
         workbook = Workbook()
@@ -250,25 +265,44 @@ class TransDatabase(dict):
         workbook.save(file)
 
     def __json_save(self, file):
-        # TODO: implement
-        pass
+        std_dict = {}
+        for key, value in self.items():
+            std_list = []
+            for trans_pair in value:
+                std_list.append(list(trans_pair))
+            std_dict[key] = std_list
+        std_dict["info"] = self.info
+        file_obj = open(file, "w")
+        json.dump(std_dict, file_obj, indent="    ", ensure_ascii=False)
+        file_obj.close()
 
     @staticmethod
     def __xlsx_load(file):
+        # TODO: implement info sheet load
         workbook = load_workbook(file)
         kwargs = {}
         for spreadsheet in workbook.worksheets:
-            trans_list = TransList()
+            decor_tlist = []
             spreadsheet_name = spreadsheet.title
+            if spreadsheet_name == "info":   # TODO: implement info constant
+                continue
             for row in spreadsheet.iter_rows(min_row=1, max_col=2, values_only=True):
                 # TODO: add ordered sequence suport to the TransPair constructor
-                trans_list.append(TransPair(row[0], row[1]))
-            kwargs[spreadsheet_name] = trans_list
+                # TODO: empty cell guard needs improviment
+                if row[0] == None or row[1] == None:
+                    break
+                decor_tlist.append([row[0], row[1]])
+            kwargs[spreadsheet_name] = decor_tlist
         return kwargs
 
-    def __json_load(self, file):
+    @staticmethod
+    def __json_load(file):
         # TODO: implement
-        pass
+        file = open(file, "r")
+        kwargs = json.load(file)
+        file.close()
+        kwargs.pop("info")  # TODO: reimplement metadata
+        return kwargs
 
 
 def test_db2():
@@ -308,6 +342,7 @@ def td_test():
 
 
 if __name__ == '__main__':
-    my_tdb = TransDatabase.fromfile(r"../database/Acidentes/Acidentes_en_to_pt_dictionary.xlsx")
-    my_tdb.save("test.xlsx")
-    print(my_tdb)
+    # ~ my_tdb = TransDatabase.fromfile(r"../database/Acidentes/Acidentes_en_to_pt_dictionary.xlsx")
+    # ~ my_tdb.save(r"../test_noascii.json")
+    my_tdb2 = TransDatabase.fromfile(r"../test_noascii.json")
+    print(len(my_tdb2["phrases"]))
