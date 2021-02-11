@@ -2,10 +2,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 import collections.abc
 import json
-import pickle
 import pathlib
-import inspect
-import copy
 
 
 class TransPair(collections.UserList):
@@ -133,17 +130,23 @@ class TransDatabase(dict):
     mere index for you to know the order in which you have to store the
     sentences, but not that does not stop the user store them wrong.
     """
-    def __init__(self, first_lang, second_lang, **kwargs):
+    INFO_TITLE = "info"
+    LANGS = "language"
+
+    def __init__(self, first_lang=None, second_lang=None, **kwargs):
         super().__init__()
-        self.info = {
-            "language": [first_lang, second_lang],
-            "creator": "Daniel Daninsky",
-            "script": "duobreaker v0.1"
-        }
-        # TODO: pop info, imprement better metadata handler
-        if kwargs:
-            if "info" in kwargs:
-                kwargs.pop("info")
+        if self.INFO_TITLE in kwargs:
+            self.info = kwargs[self.INFO_TITLE]
+            kwargs.pop(self.INFO_TITLE)
+            self.info[self.LANGS] = self.__chk_lang_attr(first_lang, second_lang)
+        else:
+            if first_lang is None or second_lang is None:
+                raise TypeError("first_lang or second_lang has no attribute")
+            self.info = {
+                self.LANGS: self.__chk_lang_attr(first_lang, second_lang),
+                "creator": "Daniel Daninsky",
+                "script": "duobreaker v0.1"
+            }
         for tlist_name, decor_tlist in kwargs.items():
             tlist = TransList()
             for tpair in decor_tlist:
@@ -172,16 +175,16 @@ class TransDatabase(dict):
         """
         if trans_list_name in self:
             raise KeyError("TransList already exists")
-        if trans_list == None:
+        if trans_list is None:
             trans_list = TransList()
         else:
             self.__setitem__(trans_list_name, trans_list)
 
     def get_translation(self, key, sentence, lang=None):
         """Get the translation."""
-        if lang == self.langs[0]:
+        if lang == self.info[self.LANGS][0]:
             return self[key].get_translation(sentence, 1)
-        elif lang == self.langs[1]:
+        elif lang == self.info[self.LANGS][1]:
             return self[key].get_translation(sentence, 2)
         else:
             return self[key].get_translation(sentence, 0)
@@ -194,7 +197,12 @@ class TransDatabase(dict):
             if i == index:
                 return self[item]
 
+    def change_lang_attrs(self, first_lang, second_lang):
+        """Change the language attributes."""
+        self.info["language"] = TransPair(first_lang, second_lang)
+
     def save(self, file, overwrite=False):
+        # TODO: implement overwrite guard
         if not isinstance(file, pathlib.Path):
             file = pathlib.Path(file)
         extension = file.suffix
@@ -215,40 +223,32 @@ class TransDatabase(dict):
         if not isinstance(file, pathlib.Path):
             file = pathlib.Path(file)
         extension = file.suffix
-        extension = extension.casefold()    # <- this is fucking bullshit
-        first_lang = "EN-US"   # TODO: hardcoded temporariamente
-        second_lang = "PT-BR"
+        extension = extension.casefold()
         if extension == ".xlsx":
-            # TODO: add a attribute support to the files
-            kwargs = cls.__xlsx_load(file)
-            return cls(first_lang, second_lang, **kwargs)
+            kwargs = cls.__xlsx_load(file, cls.INFO_TITLE)
         elif extension == ".json":
             kwargs = cls.__json_load(file)
-            print(kwargs)
-            return cls(first_lang, second_lang, **kwargs)
         else:
             raise ValueError("invalid extension file. xlsx or json")
+        first_lang = kwargs[cls.INFO_TITLE][cls.LANGS][0]  # confusing AS
+        second_lang = kwargs[cls.INFO_TITLE][cls.LANGS][1]
+        return cls(first_lang, second_lang, **kwargs)
 
-    def change_lang_attrs(self, first_lang, second_lang):
-        """Change the language attributes."""
-        self.info["language"] = TransPair(first_lang, second_lang)
-    
-    # TODO: make saves static methods for simplify data flow
-    # TransDatabase save --> dict, dict load --> TransDatabase
     def __xlsx_save(self, file):
         # TODO: improve style and add a info style
         workbook = Workbook()
         worksheet = workbook.active  # current working spreadsheet
         workbook.remove(worksheet)
-        def sheet_decor(worksheet):
+
+        def sheet_decor(ws):
             """Sheet style fo here, font, size, etc."""
             default_font = Font(name='Arial', size=12)
-            worksheet.column_dimensions['A'].font = default_font
-            worksheet.column_dimensions['B'].font = default_font
+            ws.column_dimensions['A'].font = default_font
+            ws.column_dimensions['B'].font = default_font
             cell_width = 60
-            cell_height = 20
-            worksheet.column_dimensions['A'].width = cell_width
-            worksheet.column_dimensions['B'].width = cell_width
+            ws.column_dimensions['A'].width = cell_width
+            ws.column_dimensions['B'].width = cell_width
+
         # add content
         for key, value in self.items():
             worksheet = workbook.create_sheet(key)
@@ -257,11 +257,8 @@ class TransDatabase(dict):
                 worksheet.cell(row=num, column=1).value = trans_pair[0]
                 worksheet.cell(row=num, column=2).value = trans_pair[1]
         # add info
-        header_font = Font(name='Arial', size=14, bold=True)
-        worksheet_info = workbook.create_sheet("info")
-        for num, (key, value) in enumerate(self.info.items(), start=1):
-            worksheet_info.cell(row=num, column=1).value = key
-            worksheet_info.cell(row=num, column=2).value = repr(value)   # repr to serialize the object
+        worksheet_info = workbook.create_sheet(self.INFO_TITLE)
+        worksheet_info["A1"] = json.dumps(self.info)
         workbook.save(file)
 
     def __json_save(self, file):
@@ -271,25 +268,24 @@ class TransDatabase(dict):
             for trans_pair in value:
                 std_list.append(list(trans_pair))
             std_dict[key] = std_list
-        std_dict["info"] = self.info
+        std_dict[self.INFO_TITLE] = self.info
         file_obj = open(file, "w")
         json.dump(std_dict, file_obj, indent="    ", ensure_ascii=False)
         file_obj.close()
 
     @staticmethod
-    def __xlsx_load(file):
-        # TODO: implement info sheet load
+    def __xlsx_load(file, info_title):
         workbook = load_workbook(file)
         kwargs = {}
+        if info_title in workbook.sheetnames:
+            kwargs[info_title] = json.loads(workbook[info_title]["A1"].value)
+            workbook.remove(workbook[info_title])
         for spreadsheet in workbook.worksheets:
             decor_tlist = []
             spreadsheet_name = spreadsheet.title
-            if spreadsheet_name == "info":   # TODO: implement info constant
-                continue
             for row in spreadsheet.iter_rows(min_row=1, max_col=2, values_only=True):
-                # TODO: add ordered sequence suport to the TransPair constructor
                 # TODO: empty cell guard needs improviment
-                if row[0] == None or row[1] == None:
+                if row[0] is None or row[1] is None:
                     break
                 decor_tlist.append([row[0], row[1]])
             kwargs[spreadsheet_name] = decor_tlist
@@ -297,52 +293,21 @@ class TransDatabase(dict):
 
     @staticmethod
     def __json_load(file):
-        # TODO: implement
         file = open(file, "r")
         kwargs = json.load(file)
         file.close()
-        kwargs.pop("info")  # TODO: reimplement metadata
         return kwargs
 
-
-def test_db2():
-    my_translist = TransList(("hi", "oi"))
-    my_translist2 = TransList(["car", "carro"])
-    new_translist = TransList()
-    my_trans_pair = TransPair("olá", "hello")
-    new_translist.extend(my_translist)
-    new_translist.extend(my_translist2)
-
-    print(my_translist, my_translist2, sep="\n")
-
-
-def tl_contains_test():
-    hi = TransPair("hi", "oi")
-    my_trans_list = TransList(hi)
-    my_trans_list.append(hi)
-
-def td_test():
-    my_tl = TransList()
-    translations = [["car", "carro"], ["water", "água"]]
-    for phrases in translations:
-        my_tl.append(TransPair(phrases[0], phrases[1]))
-
-    my_database = TransDatabase("en", "pt")
-    my_database.add("saudações", my_tl)
-    my_database.add("phrases")
-    my_database["daniel"] = my_tl
-
-    my_tl_back = my_database["saudações"]
-
-    print(len(my_tl))
-    print(len(my_database["daniel"]))
-    print(type(my_database["daniel"]))
-    print(my_tl)
-    print(my_database)
+    @staticmethod
+    def __chk_lang_attr(fl, sl):
+        if not isinstance(fl, str):
+            fl = str(fl)
+        if not isinstance(sl, str):
+            sl = str(sl)
+        if fl == sl:
+            raise ValueError("languages has same attribute value.")
+        return [fl, sl]
 
 
 if __name__ == '__main__':
-    # ~ my_tdb = TransDatabase.fromfile(r"../database/Acidentes/Acidentes_en_to_pt_dictionary.xlsx")
-    # ~ my_tdb.save(r"../test_noascii.json")
-    my_tdb2 = TransDatabase.fromfile(r"../test_noascii.json")
-    print(len(my_tdb2["phrases"]))
+    pass
