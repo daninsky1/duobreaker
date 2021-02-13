@@ -1,0 +1,17 @@
+#ignore these directories
+.idea/
+venv/
+src/__pycache__/
+database/
+
+#ignore these extensions
+**.xlsx
+**.json
+**.bat
+
+#ignone these sphinx files and dir
+doc/_build
+doc/_static
+doc/_templates
+doc/make.bat
+doc/Makefile
