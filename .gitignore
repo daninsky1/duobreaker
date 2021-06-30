@@ -1,6 +1,7 @@
 #ignore these directories
 .idea/
 venv/
+venv_linux
 src/__pycache__/
 database/
 
