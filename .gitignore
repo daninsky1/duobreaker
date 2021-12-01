@@ -1,7 +1,8 @@
 #ignore these directories
 .idea/
 venv/
-venv_linux
+venv_linux/
+win_venv/
 src/__pycache__/
 database/
 
@@ -11,6 +12,7 @@ database/
 **.bat
 *.swp
 *.vim
+*.log
 
 #ignone these sphinx files and dir
 ../phrase_pair_db/doc/_build

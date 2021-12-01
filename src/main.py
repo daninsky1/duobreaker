@@ -7,12 +7,9 @@ import pickle
 import time
 import logging
 import pathlib
-from database import Database
+from database import TransDatabase
 
-# Notification obj
-toaster = ToastNotifier()
 
-# Constants
 DUOLINGO = 'https://duolingo.com'
 
 # time.sleep compress
@@ -567,7 +564,6 @@ def run_levels(skill_name, replay=False, play_all_levels=True):
         ).text
 
         if (level_status == 'Nível 5/5') and (replay != True):
-            toaster.show_toast('Duo Breaker', 'All Games Are Done!')
             print('All Games Are Done!')
             break
 
