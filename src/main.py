@@ -11,37 +11,17 @@ from database import TransDatabase
 
 
 DUOLINGO = 'https://duolingo.com'
-
-# time.sleep compress
 wait = time.sleep
 
-# Web driver object 'Firefox' or 'Chrome'
-driver = 'Firefox'
-if driver == 'Chrome':
-    chrome_options = webdriver.ChromeOptions()
-    prefs = {'profile.default_content_setting_values.notifications': 2}
-    chrome_options.add_experimental_option('prefs', prefs)
-    driver = webdriver.Chrome(chrome_options=chrome_options)
-elif driver == 'Firefox':
-    driver = webdriver.Firefox()
-
-
-def log_init():
-    """Setup the logger file"""
-    log_path = pathlib.Path.cwd() / 'log'
-    log_path.mkdir(exist_ok=True)
-
-    LOG_FORMAT = '%(levelname)s %(asctime)s - %(message)s'
-    logging.basicConfig(filename=log_path / 'log.log',
-                        level=logging.DEBUG,
-                        format=LOG_FORMAT,
-                        filemode='w')
-    global logger
-    logger = logging.getLogger()
-    logger.info('Starting...')
-
-
-log_init()
+def init():
+    driver = 'Firefox'      # 'Chrome'
+    if driver == 'Chrome':
+        chrome_options = webdriver.ChromeOptions()
+        prefs = {'profile.default_content_setting_values.notifications': 2}
+        chrome_options.add_experimental_option('prefs', prefs)
+        driver = webdriver.Chrome(chrome_options=chrome_options)
+    elif driver == 'Firefox':
+        driver = webdriver.Firefox()
 
 
 class Cookie():
@@ -51,13 +31,11 @@ class Cookie():
         ck_folder = pathlib.Path.cwd() / 'cookie'
         ck_folder.mkdir(exist_ok=True)
         self.COOKIE_PATH = ck_folder / 'cookie.txt'
-
         self.driver = driver
         self.url = url
 
     def save_cookie(self):
         pickle.dump(self.driver.get_cookies(), open(self.COOKIE_PATH, 'wb'))
-        logger.info('Cookie saved.')
 
     def load_cookie(self):
         cookies = pickle.load(open(self.COOKIE_PATH, 'rb'))
@@ -66,19 +44,16 @@ class Cookie():
         self.driver.get(self.url)
         for cookie in cookies:
             self.driver.add_cookie(cookie)
-        logger.info('Cookie loaded.')
 
     def delete_cookie(self):
         self.driver.delete_all_cookies()
         with open(self.COOKIE_PATH, 'wb') as file:
             file.write(b'')
-        logger.info('Cookie deleted.')
 
     def update_cookie(self):
         """It's broken"""
         self.delete_cookie()
         self.save_cookie()
-        logger.info('Cookie updated.')
 
 
 def initializate(cookie):
@@ -124,7 +99,6 @@ Exclua cookie.txt em cookie e reinicie o script.''')
             input('Aperte qualquer botão para sair')
             driver.quit()
 
-    logger.info('init Duo Breaker: Done!')
 
 # Aux functions to the games and A.I.
 
@@ -139,7 +113,6 @@ def next_button(next_button_path='//div[@class="_1cw2r"]',
     2 - 'visibility'
     """
 
-    logger.info('next_button called.')
 
     if wait_until == 'clickable':
         return WebDriverWait(driver, timeout).until(
@@ -159,7 +132,6 @@ def next_button(next_button_path='//div[@class="_1cw2r"]',
 
 def check_keyboard():
     """Some games need the keyboard to be turned on for the script can write the answer"""
-    logger.info('check_keyboard called.')
     try:
         driver.find_element_by_xpath('//div[@class="_20M9T _25h83"]')
     # print('teste teclado')
@@ -183,7 +155,6 @@ right_solution = lambda: driver.find_element_by_xpath('//div[starts-with(@class,
 
 def play_card_choice(header, card_choice_database):
     '''Selecionar a carta correspondente em inglês'''
-    logger.info('play_card_choice called.')
 
     if not isinstance(card_choice_database, Database):
         raise EOFError('TypeError. It\'s not a Database object.')
@@ -220,13 +191,11 @@ def play_card_choice(header, card_choice_database):
             print('Errei, a resposta é:\n%s' % right_solution())
 
             card_choice_database.add_translation(right_solution(), to_transl)
-    logger.info('play_card_choice end.')
 
 
 def play_phrase_choice(header, phrase_choice_database):
     '''Jogo de multipla escolha pede que você marque a tradução do português para
     o inglês'''
-    logger.info('play_phrase_choice called.')
 
     if not isinstance(phrase_choice_database, Database):
         raise EOFError('TypeError. It\'s not a Database object.')
@@ -264,12 +233,10 @@ def play_phrase_choice(header, phrase_choice_database):
             print('Errei, a resposta é:\n%s\n' % right_solution())
 
             phrase_choice_database.add_translation(right_solution(), to_transl)
-    logger.info('play_phrase_choice end.')
 
 
 def play_phrase_transl(header, phrase_transl_database):
     '''Resolves the translation games'''
-    logger.info('play_phrase_transl called.')
 
     if not isinstance(phrase_transl_database, Database):
         raise EOFError('TypeError. It\'s not a Database object.')
@@ -311,12 +278,10 @@ def play_phrase_transl(header, phrase_transl_database):
             print(right_solution())
 
             phrase_transl_database.add_translation(right_solution(), to_transl)
-    logger.info('play_phrase_transl end.')
 
 
 def play_word_transl(header, word_transl_database):
     '''O jogo pede para você escrever uma palavra em inglês'''
-    logger.info('play_word_transl called.')
 
     if not isinstance(word_transl_database, Database):
         raise EOFError('TypeError. It\'s not a Database object.')
@@ -343,13 +308,11 @@ def play_word_transl(header, word_transl_database):
         print(right_solution())
 
         word_transl_database.add_translation(right_solution(), to_transl)
-    logger.info('play_word_transl end.')
 
 
 def play_compl_the_phrase_choice(header, compl_the_phrase_choice_database):
     '''o jogo pede para que você complete a frase com a resposta correta e oferece
     multiplas escolhas'''
-    logger.info('play_compl_the_phrase_choice called.')
 
     if not isinstance(compl_the_phrase_choice_database, Database):
         raise EOFError('TypeError. It\'s not a Database object.')
@@ -437,12 +400,10 @@ def play_compl_the_phrase_choice(header, compl_the_phrase_choice_database):
             wait(1)
 
             compl_the_phrase_choice_database.add_translation(site_answer, translation_pt)
-    logger.info('play_compl_the_phrase_choice end.')
 
 
 def play_compl_the_phrase_transl(header, compl_the_phrase_transl_database):
     '''Insert doc'''
-    logger.info('play_compl_the_phrase_transl called.')
 
     if not isinstance(compl_the_phrase_transl_database, Database):
         raise EOFError('TypeError. It\'s not a Database object.')
@@ -486,7 +447,6 @@ def play_compl_the_phrase_transl(header, compl_the_phrase_transl_database):
         print(right_solution())
 
         compl_the_phrase_transl_database.add_translation(right_solution(), to_transl)
-    logger.info('play_compl_the_phrase_transl end.')
 
 
 header_xpath = '//h1[@data-test="challenge-header"]'
