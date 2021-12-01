@@ -7,7 +7,6 @@ import pickle
 import time
 import logging
 import pathlib
-from win10toast import ToastNotifier
 from database import Database
 
 # Notification obj
@@ -500,7 +499,6 @@ lesson_complete = '//h2[@data-test="answers-correct"]'
 
 def run_games():
     '''Runs the A.I.'''
-
     while True:
         wait(0.5)
         # Is duolingo speaking? (this only skip with next button)

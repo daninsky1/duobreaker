@@ -240,6 +240,5 @@ def tdb_load_save_test():
 
 
 if __name__ == "__main__":
-    import json
     print(dir(tuple))
     # tp_append()

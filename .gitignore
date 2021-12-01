@@ -9,10 +9,13 @@ database/
 **.xlsx
 **.json
 **.bat
+*.swp
+*.vim
 
 #ignone these sphinx files and dir
-doc/_build
-doc/_static
-doc/_templates
-doc/make.bat
-doc/Makefile
+../phrase_pair_db/doc/_build
+../phrase_pair_db/doc/_static
+../phrase_pair_db/doc/_templates
+../phrase_pair_db/doc/make.bat
+../phrase_pair_db/doc/Makefile
+
